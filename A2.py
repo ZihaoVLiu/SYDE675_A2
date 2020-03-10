@@ -1,4 +1,6 @@
 from time import time
+import random
+import copy
 import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix
@@ -16,32 +18,26 @@ order = [1,2,3,4,5,6,7,8,9,10,11,12,13,0]
 wine = wine[order]
 
 #modify the header name
-game.columns = ['tl', 'tm', 'tr', 'ml', 'mm', 'mr', 'll', 'lm', 'lr', 'Class']
+gameHeaders = ['tl', 'tm', 'tr', 'ml', 'mm', 'mr', 'll', 'lm', 'lr', 'Class']
 wineHeaders = ['Alcohol', 'Malic acid', 'Ash', 'Alcalinity of ash', 'Magnesium', 'Total phenols',
                 'Flavanoids', 'Nonflavanoid phenols', 'Proanthocyanins', 'Color intensity', 'Hue',
                 'OD280/OD315 of diluted wines', 'Proline', 'Class']
-wine.columns = wineHeaders
 
+#change the data structure from dataframe into list
+gameList = []
+for item in range(game.shape[0]):
+    gameList.append(list(game.iloc[item,:]))
+
+wineList = []
+for item in range(wine.shape[0]):
+    wineList.append(list(wine.iloc[item,:]))
+'''
 #randmoly shuffle rows and keep the index order
 #this operation disruptes data consistency, which could enhance the classification accuracy
 gameR = game.sample(frac=1).reset_index(drop=True)
 ga = pd.read_csv('wocao.data')
-ga = ga.iloc[:, 1:]
+ga = ga.iloc[:, 1:]'''
 
-#change the data structure from dataframe into list
-dataSet = []
-for item in range(ga.shape[0]):
-    dataSet.append(list(ga.iloc[item,:]))
-labels = list(ga.columns)
-
-def getEnt1(data):
-    '''Calculate the  of given dataset
-    input parameter is the original dataset
-    return value is the entropy vlaue'''
-    numSample = data.shape[0] # Total number of input dataset
-    infoSat = data.iloc[:,-1].value_counts() # statistic information of given class
-    p = infoSat/numSample # the probability of each class
-    return sum(-p * np.log2(p)) # get the entropy of input dataset
 
 def getEnt(data):
     '''Calculate the  of given dataset
@@ -134,20 +130,17 @@ def buildTree(data, labels, function):
         labels provides the attribute label name to this function
         function parameter is the function name of decision-tree learning algorithms (one of getIG or getGR)
         return a dictionary type tree'''
-    newLables = labels.copy()
-    # 获取标签属性，dataSet最后一列，区别于labels标签名称
-    classList = [sample[-1] for sample in data]
-    # 树极端终止条件判断
-    # 标签属性值全部相同，返回标签属性第一项值
+    newLables = copy.copy(labels)
+    classList = [sample[-1] for sample in data]  # store all the class labels in a list
+    # define the recursive termination condition
+    # all labels are positive or negative
     if classList.count(classList[0]) == len(classList):
         return classList[0]
-    # 只有一个特征（1列）
-    classNameCount = []
+    # only one attribute is left.
     if len(data[0]) == 1:
         classNames = list(set(classList))
         classNameCount = [classList.count(className) for className in classNames]
         return classNames[classNameCount.index(max(classNameCount))]
-    # 获取最优特征列索引
     IGorGRList = function(data)  # get the information gain or gain ratio list
     maxIGorGRIndex = getMax(IGorGRList)  # get index with the highest IG
     bestAttributeName = newLables[maxIGorGRIndex]  # pair the index with corresponding attribute name
@@ -186,34 +179,35 @@ def typeJudge(branches, twig):
     else:
         return False
 
-def classify(inputTree, featLabels, testVec):
-    # 获取根结点名称，将dict转化为list
-    firstSide = list(inputTree.keys())
-    # 根结点名称String类型
-    firstStr = firstSide[0]
-    # 获取根结点对应的子节点
-    secondDict = inputTree[firstStr]
-    # 获取根结点名称在标签列表中对应的索引
-    featIndex = featLabels.index(firstStr)
-    # 由索引获取向量表中的对应值
-    key = testVec[featIndex]
-    # 获取树干向量后的对象
-
-    if key not in secondDict.keys():
-        print(key)
-        return ga.iloc[:,-1].value_counts().keys()[0]
-
-
-    valueOfFeat = secondDict[key]
-    # 判断是子结点还是叶子节点：子结点就回调分类函数，叶子结点就是分类结果
-    # if type(valueOfFeat).__name__=='dict': 等价 if isinstance(valueOfFeat, dict):
-    if isinstance(valueOfFeat, dict):
-        classLabel = classify(valueOfFeat, featLabels, testVec)
-    else:
-        classLabel = valueOfFeat
-    return classLabel
-
 def predictResult(tree, labels, sample, train):
+    '''use decision tree to predict the class label of the input sample
+        tree: decision tree build by buildTree() function
+        labels: to get the header of data (using .columns to get the list)
+        sample: a list, the input test sample
+        return the prediction value'''
+    classNameList = [sample[-1] for sample in train]
+    classNames = list(set(classNameList))
+    classNameCount = [classNameList.count(className) for className in classNames]
+    maxClassLabel = classNames[classNameCount.index(max(classNameCount))]  # class label with highest value count
+
+    node = list(tree.keys())  # get the upper tree node of each recursion in a list
+    nodeName = node[0]  # get the attribute name of node
+    branches = tree[nodeName]  # get branches under node
+    labelIndex = labels.index(nodeName)  # get nodeName index of labels
+    sampleValue = sample[labelIndex]  # get the attribute value of corresponding sample based on the labelIndex
+    '''This part is very important, if without the following if statement, and sampleValue 
+                    did not exist under this branch, a "False" value will be returned.'''
+    if sampleValue in branches:
+        twig = branches[sampleValue]  # the branches under parent branches ('twig' is used here)
+    else:
+        return maxClassLabel
+
+    if type(twig) == dict:
+        return predictResult(twig, labels, sample, train)  # continue recursion but use twig branch
+    else:
+        return twig
+
+def predictResult1(tree, labels, sample, train):
     '''use decision tree to predict the class label of the input sample
     tree: decision tree build by buildTree() function
     test: to get the header of data (using .columns to get the list)
@@ -248,28 +242,29 @@ def predictResult(tree, labels, sample, train):
         else:
             continue
 
-def batchPredict(train, test, function):
+def batchPredict(train, test, labels, function):
     '''output the test set with a column of prediction values
     train: training dataset
+    test: testing dataset
+    labels is the dataset headers
     function: the function name of decision-tree learning algorithms (one of getIG or getGR)
-    test: testing dataset'''
-    testSampleNumber = test.shape[0] # get the sample number of test set
-    tree = buildTree(train, function) # construct the tree
-    labels = list(train.columns) # get all the header number for predictResult function
+    :return a list with prediction results'''
+    testSampleNumber = len(test)  # get the sample number of test set
+    tree = buildTree(train, labels, function) # construct the tree
     result = [] # initial a list to store prediction value
-    for item in range(testSampleNumber): # iterate each sample in test dataset
-        sample = test.iloc[item, :-1]
+    for sample in test:  # iterate each sample in test dataset
         result.append(predictResult(tree, labels, sample, train))
-    test.insert(test.shape[1], 'predict', result)
-    #test['predict'] = result
-    return test
+    if testSampleNumber != len(result):
+        print('Error: The number of test data is wrong.')
+    return result
 
-def plotConfusionMatrix(data):
+def plotConfusionMatrix(test, predictResult):
     '''output the confusion matrix and draw heatmap
-    data: dataset returned from batchPredict() function
+    test: dataset used to construct a classifier
+    predictResult: result from batchPredict() function
     print the confusion matrix and draw a confusion matrix heatmap'''
-    tResult = data.iloc[:, -2]
-    pResult = data.iloc[:, -1]
+    tResult = [label[-1] for label in test]
+    pResult = predictResult
     c = confusion_matrix(tResult, pResult)
     #sns.heatmap(c, annot=True, ax=ax)
     #ax.set_title('Confusion Matrix')
@@ -278,49 +273,68 @@ def plotConfusionMatrix(data):
     #plt.show()
     return c
 
-def calAccuracy(test):
+def calAccuracy(test, predictResult):
     '''calculate the accuracy of test prediction dataset
-    test is the input test dataset returned from batchPredict
+    test: dataset used to construct a classifier
+    predictResult: result from batchPredict() function
     return a accuracy value'''
-    totalTrue = sum(test.iloc[:,-1]==test.iloc[:,-2]) # calculate the same total number
-    # between ground truth and prediction
-    total = test.shape[0]
+    if len(test) != len(predictResult):
+        print("Error: The lengths between two input parameters are different")
+        return 0
+    tResult = [label[-1] for label in test]  # store the test class result into a list
+    pResult = predictResult
+    totalTrue = len([1 for index in range(len(tResult)) if tResult[index] == pResult[index]])
+    # calculate the same total number between ground truth(test result) and prediction(predict result)
+    total = len(predictResult)
     accuracy = totalTrue / total
     return accuracy
 
 def randomShuffle(data):
     '''randomly shuffle the input dataset
     the input parameter is the original dataset
-    return a randomly shuffle dataset'''
-    RSdata = data.sample(frac=1).reset_index(drop=True)
-    return RSdata
+    return a randomly shuffle list'''
+    return random.shuffle(data)
 
 def getThreshold(data):
     '''function get the threshold of each attribute based on information gain approach
     input parameter is the original dataset
     return dataset is a discrete dataset'''
+
+    def bubble_sort(list):
+        '''
+        used in the following list sort procedure
+        :param list:  list with inner list, and the first element of inner list is a float number
+        :return: an ascending sort the list
+        '''
+        count = len(list)
+        for i in range(count):
+            for j in range(i + 1, count):
+                if list[i][0] > list[j][0]:
+                    list[i], list[j] = list[j], list[i]
+        return list
+
     start = time()
     originalEnt = getEnt(data) # get the initial entropy
-    numSample = data.shape[0] # number of samples
-    numAttribute = data.shape[1]-1 # number of attributes (remove the Class attribute)
-    headerName = data.columns # store the header name into a list
+    numSample = len(data) # number of samples
+    numAttribute = len(data[0]) - 1 # number of attributes (remove the Class attribute)
+    #headerName = labels  # store the header name into a list
     thresholdList = [] # initial a list to store threshold of attribute
     for j in range(numAttribute): # iterate for each attribute
-        column = data.iloc[:, [j,-1]] # get the corresponding attribute and Class attribute into dataframe
-        column = column.sort_values(headerName[j])  # ascending sort the dataframe
+        column = [[sample[j], sample[-1]] for sample in data]
+        column = bubble_sort(column)  # ascending sort the dataframe
         IGList = [] # initial a list to store information gain of each sample
-        for i in range(numSample): # iterate for each sample
-            before = column.iloc[:i+1, :] # the samples before i (including i)
-            after = column.iloc[i+1:, :] # the samples after i (excluding i)
+        for i in range(numSample-1): # iterate for each sample
+            before = column[:i+1] # the samples before i (including i)
+            after = column[i+1:] # the samples after i (excluding i)
             beforeEnt = getIG(before) # get the entropy
             afterEnt = getIG(after)
             conditionEnt = ((i + 1) * beforeEnt[0] / numSample) + \
                            ((numSample - i - 1) * afterEnt[0] / numSample) # calculate the conditional entropy
             IGList.append(originalEnt - conditionEnt) # append the information gain into the list
-        print(IGList)
+        #print(IGList)
         print('%d attribute IG calculating done' % (j+1))
         index = IGList.index(max(IGList)) # get the index of maximum information gain
-        threshold = (column.iloc[index, 0] + column.iloc[index + 1, 0]) / 2 # get the threshold
+        threshold = (column[index][0] + column[index + 1][0]) / 2 # get the threshold
         # (mean of index value and next index value)
         thresholdList.append(threshold) # append the threshold into list
     print(thresholdList)
@@ -335,55 +349,48 @@ def con2dis(thresholdList, data):
     :param data: the original continuous dataset
     :return: a discrete dataset
     '''
-    if len(thresholdList) == (data.shape[1] - 1):
-        headerName = list(data.columns) # get the header of dataset
-        newdata = np.arange(data.shape[0] * data.shape[1]).reshape(data.shape[0], data.shape[1]) # create new dataframe
-        newdata_df = pd.DataFrame(newdata)
-        newdata_df.iloc[:, -1] = data.iloc[:, -1]
-        newdata_df.columns = headerName
-        numAttribute = data.shape[1]-1 # get the number of attribute (except the Class label)
-        for i in range(numAttribute): # iterate each attribute
-            column = data.iloc[:,i] # get the corresponding attribute
-            indexLargeList = column[column > thresholdList[i]].index # get index that larger than threshold
-            indexSmallList = column[column <= thresholdList[i]].index # get index that smaller than threshold
-            newdata_df.iloc[indexLargeList, i] = 1 # set 1 to those larger index
-            newdata_df.iloc[indexSmallList, i] = 0 # set 0 to those smaller index
-        return newdata_df
+    if len(thresholdList) == (len(data[0]) - 1):
+        for attribute in range(len(thresholdList)):
+            for sample in data:
+                sample[attribute] = 1 if sample[attribute] > thresholdList[attribute] else 0
+        return data
     else:
-        print('Lengths of input parameters do not natch')
+        print('Lengths of input parameters do not match')
 
-def foldCV(k, data, function):
+def foldCV(k, data, labels, function):
     '''this function computes the average and variance accuracy of input data
     k is the number of fold
     data is the original data
+    labels is the dataset headers
     function parameter is the function name of decision-tree learning algorithms (one of getIG or getGR)
     return a list of accuracy and a list of confusion matrix'''
-    data = randomShuffle(data) # permute training data at each run
-    sampleCount = data.shape[0] # get the total number of samples
+    random.shuffle(data) # permute training data at each run
+    sampleCount = len(data) # get the total number of samples
     cvCount = round(sampleCount / k) # number of cross validation fold
     accuractList = [] # initialed a list to save accuracy
     confusionMatrixList = [] # initialed a list to save confusion matrix
     for i in range(k): # iterate k times
-        cvFold = data.iloc[i*cvCount:(i+1)*cvCount,:] # get the cross validation dataset based on number of fold
-        trainFold = pd.concat([data.iloc[0:i*cvCount,:], data.iloc[(i+1)*cvCount:,:]]) # set the rest of samples
+        cvFold = data[i*cvCount:(i+1)*cvCount] # get the cross validation dataset based on number of fold
+        trainFold = data[0:i*cvCount] + data[(i+1)*cvCount:]# set the rest of samples
         # as training dataset
-        cvFold = batchPredict(trainFold, cvFold, function)  # get the prediction result
-        accuractList.append(calAccuracy(cvFold))  # compute accuracy and append into a list
-        confusionMatrixList.append(plotConfusionMatrix(cvFold))  # same as above but confusion matrix
+        testResult = batchPredict(trainFold, cvFold, labels, function)  # get the prediction result
+        accuractList.append(calAccuracy(cvFold, testResult))  # compute accuracy and append into a list
+        confusionMatrixList.append(plotConfusionMatrix(cvFold, testResult))  # same as above but confusion matrix
         print('***The %d fold cross validation done***' % (i+1))
     return accuractList, confusionMatrixList
 
-def tentenCV(k, data, function):
+def tentenCV(k, data, labels, function):
     '''implement the 10-times-10-fold cross validation approach
     k is the number of fold
     data is the original data
+    labels is the dataset headers
     function parameter is the function name of decision-tree learning algorithms (one of getIG or getGR)
     return a list of accuracy and a list of confusion matrix'''
     start = time()
     accuracyList = []  # initial a list to store the accuracy
     confusionMatrixList = []  # initial a list to store the confusion matrix
     for i in range(10):  # iterate ten time of k-fold cross validation
-        accuracy, confusionMatrix = foldCV(k, data, function)
+        accuracy, confusionMatrix = foldCV(k, data, labels, function)
         accuracyList.append(accuracy)
         confusionMatrixList.append(confusionMatrix)
         print('%d time 10-fold cross validation is done' % (i + 1))
@@ -410,6 +417,8 @@ def calVariance(accuracyList):
     var10CVFoldList = list(map(lambda item: np.var(item), accuracyList))
     return np.mean(var10CVFoldList)
 
+
+# Have not finished
 def addAttNoise(data, L):
     '''
     Add an attributes noise for L% of total samples (flip the attribute randomly).
@@ -417,7 +426,6 @@ def addAttNoise(data, L):
     :param L: the percentage of noise (must between 0 and 1)
     :return: a dataset with L% noise
     '''
-    import random
     numAttribute = data.shape[1] - 1  # get the number of attribute (except the class)
     numSample = data.shape[0]  # get the number of samples
     numL = round(L * numSample)  # get the number of L * total
@@ -434,36 +442,36 @@ def addAttNoise(data, L):
     return randomShuffle(newData)
 
 
-# thresholdList = getThreshold(wine)
+thresholdList = getThreshold(wineList)
 # returned by getThreshold() function (To save time and every run time the results are same)
-thresholdList = [12.78, 2.2350000000000003, 2.0300000000000002, 18.0, 88.5, 2.335, 1.5750000000000002,
-                 0.395, 1.27, 3.46, 0.785, 2.475, 755.0]
-'''
+# thresholdList = [12.78, 2.2350000000000003, 2.0300000000000002, 18.0, 88.5, 2.335, 1.5750000000000002,
+# 0.395, 1.27, 3.46, 0.785, 2.475, 755.0]
+
 # compute 10-times-10-fold of *game dataset* using *information gain*
 print('*************** 10-times-10-fold of *game dataset* using *information gain* Start')
-acc_game_IG, CM_game_IG = tentenCV(10, game, getIG)
+acc_game_IG, CM_game_IG = tentenCV(10, gameList, gameHeaders, getIG)
 mean_game_IG = calMean(acc_game_IG)
 var_game_IG = calVariance(acc_game_IG)
 # compute 10-times-10-fold of *game dataset* using *gain ratio*
 print('*************** 10-times-10-fold of *game dataset* using *gain ratio* Start')
-acc_game_GR, CM_game_GR = tentenCV(10, game, getGR)
+acc_game_GR, CM_game_GR = tentenCV(10, gameList, gameHeaders, getGR)
 mean_game_GR = calMean(acc_game_GR)
 var_game_GR = calVariance(acc_game_GR)
 
 # transform the continuous dataset into continuous dataset
-wineDis = con2dis(thresholdList, wine)
+wineDis = con2dis(thresholdList, wineList)
 
 # compute 10-times-10-fold of *wine dataset* using *information gain*
 print('*************** 10-times-10-fold of *wine dataset* using *information gain* Start')
-acc_wine_IG, CM_wine_IG = tentenCV(10, wineDis, getIG)
+acc_wine_IG, CM_wine_IG = tentenCV(10, wineDis, wineHeaders, getIG)
 mean_wine_IG = calMean(acc_wine_IG)
 var_wine_IG = calVariance(acc_wine_IG)
 # compute 10-times-10-fold of *wine dataset* using *gain ratio*
 print('*************** 10-times-10-fold of *wine dataset* using *gain ratio* Start')
-acc_wine_GR, CM_wine_GR = tentenCV(10, wineDis, getGR)
+acc_wine_GR, CM_wine_GR = tentenCV(10, wineDis, wineHeaders, getGR)
 mean_wine_GR = calMean(acc_wine_GR)
 var_wine_GR = calVariance(acc_wine_GR)
-'''
+
 
 
 
