@@ -136,46 +136,6 @@ def buildTree(data, function):
             decisionTree[attributeName][value] = buildTree(discardAttri(data, maxIGIndex, value), function)
     return decisionTree
 
-# 决策树创建
-def buildTree1(data, function):
-    attributeList = list(data.columns)  # store all attribute index into a list
-    resultList = list(data.iloc[:, -1])  # store the class labels result
-    dataSet = []
-    for item in range(data.shape[0]):
-        dataSet.append(list(data.iloc[item, :]))
-
-    # 获取标签属性，dataSet最后一列，区别于labels标签名称
-    #classList = [example[-1] for example in dataSet]
-    # 树极端终止条件判断
-    # 标签属性值全部相同，返回标签属性第一项值
-    if resultList.count(resultList[0]) == len(resultList):
-        return resultList[0]
-    # 只有一个特征（1列）
-    if len(dataSet[0]) == 1:
-        return data.iloc[:, -1].value_counts().index[0]
-    # 获取最优特征列索引
-    #bestFeatureIndex = chooseBestFeatureToSplit(dataSet)
-    # 获取最优索引对应的标签名称
-    #bestFeatureLabel = attributeList[bestFeatureIndex]
-
-    IGList = function(data)  # get the information gain list
-    maxIGIndex = getMax(IGList)  # get index with the highest IG
-    attributeName = attributeList[maxIGIndex]  # pair the index with corresponding attribute name
-
-    # 创建根节点
-    myTree = {attributeName: {}}
-    # 去除最优索引对应的标签名，使labels标签能正确遍历
-    del (attributeList[maxIGIndex])
-    # 获取最优列
-    bestFeature = [example[maxIGIndex] for example in dataSet]
-    uniquesVals = set(bestFeature)
-    for value in uniquesVals:
-        # 子标签名称集合
-        subLabels = attributeList[:]
-        # 递归
-        myTree[attributeName][value] = buildTree(discardAttri(data, maxIGIndex, value), function)
-    return myTree
-
 #tree = buildTree(game)
 
 def saveTree(name, tree):
