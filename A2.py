@@ -28,7 +28,13 @@ gameR = game.sample(frac=1).reset_index(drop=True)
 ga = pd.read_csv('wocao.data')
 ga = ga.iloc[:, 1:]
 
-def getEnt(data):
+#change the data structure from dataframe into list
+dataSet = []
+for item in range(ga.shape[0]):
+    dataSet.append(list(ga.iloc[item,:]))
+labels = list(ga.columns)
+
+def getEnt1(data):
     '''Calculate the  of given dataset
     input parameter is the original dataset
     return value is the entropy vlaue'''
@@ -37,21 +43,33 @@ def getEnt(data):
     p = infoSat/numSample # the probability of each class
     return sum(-p * np.log2(p)) # get the entropy of input dataset
 
+def getEnt(data):
+    '''Calculate the  of given dataset
+    input parameter is the original dataset
+    return value is the entropy vlaue'''
+    numSample = len(data) # Total number of input dataset
+    classList = [classLabel[-1] for classLabel in data]  # store all the class labels in a list
+    classes = set(classList)  # get the name of class labels
+    infoSat = [classList.count(className) for className in classes]
+    p = [item/numSample for item in infoSat] # the probability of each class
+    return sum([-item * np.log2(item) for item in p]) # get the entropy of input dataset
+
 def getIG(data):
     '''Calculate the information gain value of each attribute
     input parameter is the original dataset
     return value is the information gain of each attribute'''
     IG = list() # initialed a list for information gain of each attribute
     originalEnt = getEnt(data) # get the initial entropy
-    numAttribute = data.shape[1] - 1 # get the total number of attribute
+    numAttribute = len(data[0]) - 1 # get the total number of attribute
     for i in range(numAttribute): # iterate each attribute
-        vIndex = data.iloc[:,i].value_counts().index # get all unique value of the attribute
+        attributValues = [sample[i] for sample in data]
+        valueName = set(attributValues)  # get all unique value of the attribute
         attributEnt = 0
-        for j in vIndex: # iterate each value in the attribute
-            itemData = data[data.iloc[:, i] == j] # get dataset of indicated attribute value
-            # ('j' in this iteration)
+        for j in valueName: # iterate each value in the attribute
+            itemData = [data[index] for index in range(len(attributValues)) if attributValues[index] == j]
+            # get dataset of indicated attribute value ('j' in this iteration)
             itemEnt = getEnt(itemData) # get the entropy of the specific attribute value
-            attributEnt += (itemData.shape[0] / data.shape[0]) * itemEnt
+            attributEnt += (len(itemData) / len(data)) * itemEnt
         #print('The %d attribute entropy is %f.' % (i, attributEnt))
         #print('The %d attribute Information Gain is %f.' % (i, originalEnt - attributEnt))
         IG.append(originalEnt - attributEnt) # calculate the information gain
@@ -64,22 +82,23 @@ def getGR(data):
     :return: the gain ratio of each attribute
     '''
     SI = []  # a list of Intrinsic Information of the Attribute
-    IG = getIG(data)
-    originalEnt = getEnt(data)  # get the initial entropy
-    numAttribute = data.shape[1] - 1  # get the total number of attribute
-    numSample = data.shape[0]  # Total number of input dataset
+    IG = list() # initialed a list for information gain of each attribute
+    originalEnt = getEnt(data) # get the initial entropy
+    numAttribute = len(data[0]) - 1 # get the total number of attribute
+    numSample = len(data)  # Total number of input dataset
     for i in range(numAttribute): # iterate each attribute
-        vIndex = data.iloc[:,i].value_counts().index # get all unique value of the attribute
+        attributValues = [sample[i] for sample in data]
+        valueName = set(attributValues)  # get all unique value of the attribute
         attributEnt = 0
-        infoSat = data.iloc[:, i].value_counts()  # statistic information of given class
-        p = infoSat / numSample  # the probability of each class
-        splitInformation = sum(-p * np.log2(p))  # get the entropy of Intrinsic Information of the Attribute
+        infoSat = [attributValues.count(value) for value in valueName]  # statistic information of given class
+        p = [item / numSample for item in infoSat]  # the probability of each class
+        splitInformation = sum([-item * np.log2(item) for item in p])   # get the entropy of Intrinsic Information of the Attribute
         SI.append(splitInformation)
-        for j in vIndex: # iterate each value in the attribute
-            itemData = data[data.iloc[:, i] == j] # get dataset of indicated attribute value
-            # ('j' in this iteration)
+        for j in valueName: # iterate each value in the attribute
+            itemData = [data[index] for index in range(len(attributValues)) if attributValues[index] == j]
+            # get dataset of indicated attribute value ('j' in this iteration)
             itemEnt = getEnt(itemData) # get the entropy of the specific attribute value
-            attributEnt += (itemData.shape[0] / data.shape[0]) * itemEnt
+            attributEnt += (len(itemData) / len(data)) * itemEnt
         #print('The %d attribute entropy is %f.' % (i, attributEnt))
         #print('The %d attribute Information Gain is %f.' % (i, originalEnt - attributEnt))
         IG.append(originalEnt - attributEnt) # calculate the information gain
@@ -92,49 +111,55 @@ def getGR(data):
         GR = list(map(lambda x, y: 0 if x == y and x == 0 else x / y, IG, SI))  # calculate the information gain ratio
     return GR
 
-def getMax(IG):
+def getMax(valueslist):
     '''Output the attribute index with the highest information gain
     input parameter is a information gain list (get from getIG() or getGR() function)
     return the index number'''
-    return IG.index(max(IG))
+    return valueslist.index(max(valueslist))
 
 def discardAttri(data, index, attributeValue):
     '''discard indicated attribute but keep attribute value of given column
     data: original dataset
     index: the value returned from getMax. Indicated attribute will be discarded
     attributeValue: indicated attribute value'''
-    column = data.columns[index]
-    return data.loc[data[column] == attributeValue, :].drop(column, axis=1)
+    newDataSet = []
+    for sample in data:  # iterate each sample in dataset
+        if sample[index] == attributeValue:  # only select sample equals to the given attributeValue
+            newDataSet.append(sample[:index] + sample[(index + 1):])  # add the rest values into the sample
+    return newDataSet
 
-def buildTree(data, function):
+def buildTree(data, labels, function):
     '''build a decision tree recursively based on ID3 algorithm
-    input parameter is the original dataset
-    function parameter is the function name of decision-tree learning algorithms (one of getIG or getGR)
-    return a dictionary type tree'''
-    attributeList = list(data.columns) # store all attribute index into a list
-    resultList = data.iloc[:, -1].value_counts() # store the result
-    # statistical information into a list
-    dataShape = data.shape
-
-    # define the recursive termination condition
-    # only one attribute is left or the results of leaf node are same.
-    if dataShape[1] == 1 or resultList.values[0] == dataShape[0]:
-        return resultList.index[0] # return the result label
-
-    IGList = function(data) # get the information gain list
-    maxIGIndex = getMax(IGList) # get index with the highest IG
-    attributeName = attributeList[maxIGIndex] # pair the index with corresponding attribute name
-    #print('The attribute name is: %s' %attributeName)
-    decisionTree = {attributeName: {}} # store the decision tree into a dictionary
-    attributeList.remove(attributeName) # remove the attribute just utilized
-    values = data.iloc[:, maxIGIndex].value_counts().index # get the unique attribute value of
-    # corresponding attribute
-    for value in values: # build branch for each attribute value
-        if data.iloc[:,maxIGIndex].value_counts()[value] == 0:
-            decisionTree[attributeName][value] = resultList.index[0]
-        else:
-            decisionTree[attributeName][value] = buildTree(discardAttri(data, maxIGIndex, value), function)
-    return decisionTree
+        input parameter is the original dataset
+        labels provides the attribute label name to this function
+        function parameter is the function name of decision-tree learning algorithms (one of getIG or getGR)
+        return a dictionary type tree'''
+    newLables = labels.copy()
+    # 获取标签属性，dataSet最后一列，区别于labels标签名称
+    classList = [sample[-1] for sample in data]
+    # 树极端终止条件判断
+    # 标签属性值全部相同，返回标签属性第一项值
+    if classList.count(classList[0]) == len(classList):
+        return classList[0]
+    # 只有一个特征（1列）
+    classNameCount = []
+    if len(data[0]) == 1:
+        classNames = list(set(classList))
+        classNameCount = [classList.count(className) for className in classNames]
+        return classNames[classNameCount.index(max(classNameCount))]
+    # 获取最优特征列索引
+    IGorGRList = function(data)  # get the information gain or gain ratio list
+    maxIGorGRIndex = getMax(IGorGRList)  # get index with the highest IG
+    bestAttributeName = newLables[maxIGorGRIndex]  # pair the index with corresponding attribute name
+    myTree = {bestAttributeName: {}}  # store the decision tree into a dictionary
+    # (this is root node before starting recursive)
+    newLables.remove(bestAttributeName)  # remove the attribute just utilized
+    bestFeature = [sample[maxIGorGRIndex] for sample in data]
+    values = set(bestFeature)  # get the unique attribute value of corresponding attribute
+    for value in values:  # build branch for each attribute value
+        subLabels = newLables[:]
+        myTree[bestAttributeName][value] = buildTree(discardAttri(data, maxIGorGRIndex, value), subLabels, function)
+    return myTree
 
 #tree = buildTree(game)
 
@@ -161,6 +186,33 @@ def typeJudge(branches, twig):
     else:
         return False
 
+def classify(inputTree, featLabels, testVec):
+    # 获取根结点名称，将dict转化为list
+    firstSide = list(inputTree.keys())
+    # 根结点名称String类型
+    firstStr = firstSide[0]
+    # 获取根结点对应的子节点
+    secondDict = inputTree[firstStr]
+    # 获取根结点名称在标签列表中对应的索引
+    featIndex = featLabels.index(firstStr)
+    # 由索引获取向量表中的对应值
+    key = testVec[featIndex]
+    # 获取树干向量后的对象
+
+    if key not in secondDict.keys():
+        print(key)
+        return ga.iloc[:,-1].value_counts().keys()[0]
+
+
+    valueOfFeat = secondDict[key]
+    # 判断是子结点还是叶子节点：子结点就回调分类函数，叶子结点就是分类结果
+    # if type(valueOfFeat).__name__=='dict': 等价 if isinstance(valueOfFeat, dict):
+    if isinstance(valueOfFeat, dict):
+        classLabel = classify(valueOfFeat, featLabels, testVec)
+    else:
+        classLabel = valueOfFeat
+    return classLabel
+
 def predictResult(tree, labels, sample, train):
     '''use decision tree to predict the class label of the input sample
     tree: decision tree build by buildTree() function
@@ -171,7 +223,11 @@ def predictResult(tree, labels, sample, train):
     if type(tree) == str: # in case the input tree only has a root node
         return tree
 
-    maxClassLabel = train.iloc[:, -1].value_counts().index[0] # class label with highest value count
+    classNameList = [sample[-1] for sample in train]
+    classNames = list(set(classNameList))
+    classNameCount = [classNameList.count(className) for className in classNames]
+    maxClassLabel = classNames[classNameCount.index(max(classNameCount))]  # class label with highest value count
+
     upperNode = list(tree.keys())[0] # get the upper tree node of each recursion
     upperNodeIndex = labels.index(upperNode) # get the index number of corresponding tree node
     branches = tree[upperNode] # get the branches under the upperNode

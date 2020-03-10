@@ -20,7 +20,7 @@ ga = ga.iloc[:, 1:]
 dataSet = []
 for item in range(ga.shape[0]):
     dataSet.append(list(ga.iloc[item,:]))
-
+labels = list(ga.columns)
 
 # 原始数据
 def createDataSet():
@@ -112,7 +112,8 @@ def chooseBestFeatureToSplit(dataSet):
 
 
 # 决策树创建
-def createTree(dataSet, labels):
+def createTree(dataSet, newlabels):
+    labels = newlabels.copy()
     # 获取标签属性，dataSet最后一列，区别于labels标签名称
     classList = [example[-1] for example in dataSet]
     # 树极端终止条件判断
