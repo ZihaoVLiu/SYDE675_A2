@@ -418,28 +418,32 @@ def calVariance(accuracyList):
     return np.mean(var10CVFoldList)
 
 
-# Have not finished
+
+#Question 3:
 def addAttNoise(data, L):
     '''
-    Add an attributes noise for L% of total samples (flip the attribute randomly).
-    :param data: the target noise adding dataset
-    :param L: the percentage of noise (must between 0 and 1)
-    :return: a dataset with L% noise
+    add L percent noise into each attribute (means L percent samples values in that attributes will be flipped)
+    :param data: the list data structure of input data
+    :param L: the percent of data be added noises
+    :return: a new noised dataset (would not change input data)
     '''
-    numAttribute = data.shape[1] - 1  # get the number of attribute (except the class)
-    numSample = data.shape[0]  # get the number of samples
-    numL = round(L * numSample)  # get the number of L * total
-    data = randomShuffle(data)  # shuffle the input data to make sure the noise randomly
-    newData = data.iloc[:,:].copy()  # copy the input data
-    for i in range(numL):  # iterate numL times to select first numL samples
-        attributeRandomIndex = random.randint(0, numAttribute - 1)  # get the random attribute index
-        valuesInAttribute = list(data.iloc[:, attributeRandomIndex].value_counts().index)  # store all the values
-        # under indicated attribute
-        valueRandomIndex = random.randint(0, len(valuesInAttribute) - 2)  # get the random value index under attribute
-        valuesInAttribute.remove(data.iloc[i, attributeRandomIndex])  # remove attribute value already exist in the list
-        noise = valuesInAttribute[valueRandomIndex]  # select another value as noise
-        newData.iloc[i, attributeRandomIndex] = noise  # assign the noise value
-    return randomShuffle(newData)
+    newdata = copy.deepcopy(data)  # deep copy a dataset
+    numAttribute = len(newdata[0]) - 1  # total number of attributes
+    numSample = len(newdata) # total number of samples
+    LSampleCount = round(numSample * L)  # the number of samples should be added noise
+    random.shuffle(newdata)  # shuffle the data
+    for attribute in range(numAttribute):  # iterate each attributes
+        attributeValueList = list(set([newdata[sample][attribute] for sample in range(LSampleCount)]))
+        # store all the values which under the corresponding attributes into a list uniquely
+        for sampleIndex in range(LSampleCount):  # iterate L percent number samples
+            originalValue = newdata[sampleIndex][attribute]  # get the original value of corresponding attribute
+            attributeValueList.remove(originalValue)  # remove the original value from the list
+            newdata[sampleIndex][attribute] = attributeValueList[0]  # assign another value into the sample
+            attributeValueList.append(originalValue)  # append back original value
+    random.shuffle(newdata)  # shuffle the data
+    return newdata
+
+
 
 
 thresholdList = getThreshold(wineList)
