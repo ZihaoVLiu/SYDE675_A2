@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from time import time
 import random
 import copy
@@ -5,7 +6,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
-import matplotlib.pyplot as plt
 f,ax=plt.subplots()
 sns.set()
 
@@ -349,11 +349,12 @@ def con2dis(thresholdList, data):
     :param data: the original continuous dataset
     :return: a discrete dataset
     '''
-    if len(thresholdList) == (len(data[0]) - 1):
+    newData = copy.deepcopy(data)
+    if len(thresholdList) == (len(newData[0]) - 1):
         for attribute in range(len(thresholdList)):
-            for sample in data:
+            for sample in newData:
                 sample[attribute] = 1 if sample[attribute] > thresholdList[attribute] else 0
-        return data
+        return newData
     else:
         print('Lengths of input parameters do not match')
 
@@ -417,50 +418,69 @@ def calVariance(accuracyList):
     var10CVFoldList = list(map(lambda item: np.var(item), accuracyList))
     return np.mean(var10CVFoldList)
 
-
-
-#Question 3:
-def addAttNoise(data, L):
+def getMaxAccuracyIndex(accList):
     '''
-    add L percent noise into each attribute (means L percent samples values in that attributes will be flipped)
-    :param data: the list data structure of input data
-    :param L: the percent of data be added noises
-    :return: a new noised dataset (would not change input data)
+    return the index of maximum accuracy value in accList return from tentenCV() function
+    :param accList: a list stored accuracy return from tentenCV() function
+    :return: a list of indexes
     '''
-    newdata = copy.deepcopy(data)  # deep copy a dataset
-    numAttribute = len(newdata[0]) - 1  # total number of attributes
-    numSample = len(newdata) # total number of samples
-    LSampleCount = round(numSample * L)  # the number of samples should be added noise
-    random.shuffle(newdata)  # shuffle the data
-    for attribute in range(numAttribute):  # iterate each attributes
-        attributeValueList = list(set([newdata[sample][attribute] for sample in range(LSampleCount)]))
-        # store all the values which under the corresponding attributes into a list uniquely
-        for sampleIndex in range(LSampleCount):  # iterate L percent number samples
-            originalValue = newdata[sampleIndex][attribute]  # get the original value of corresponding attribute
-            attributeValueList.remove(originalValue)  # remove the original value from the list
-            newdata[sampleIndex][attribute] = attributeValueList[0]  # assign another value into the sample
-            attributeValueList.append(originalValue)  # append back original value
-    random.shuffle(newdata)  # shuffle the data
-    return newdata
+    tempMax = []  # initial a list to store max value in each child list
+    tempMaxIndex = []  # initial a list to store max value index in each child list
+    for eachlist in accList:  # iterate list
+        tempMax.append(max(eachlist))  # get the maximum value of each child list
+        tempMaxIndex.append(eachlist.index(max(eachlist)))  # get the maximum value index of each child list
+    foldIndex = tempMax.index(max(tempMax))  # get the index of which child list has maximum accuracy value
+    return [foldIndex, tempMaxIndex[foldIndex]]  # return a list of index value
 
-
-
+def plotHeatCM(CMList, indexList):
+    '''
+    plot the heat map of which has the maximum accuracy values
+    :param CMList: a list stored confusion matrix return from tentenCV() function
+    :param indexList: index of highest accuracy return form getMaxAccuracyIndex():
+    :return: a confusion matrix and plot a heatmap
+    '''
+    CM = CMList[indexList[0]][indexList[1]]
+    return CM
 
 thresholdList = getThreshold(wineList)
 # returned by getThreshold() function (To save time and every run time the results are same)
 # thresholdList = [12.78, 2.2350000000000003, 2.0300000000000002, 18.0, 88.5, 2.335, 1.5750000000000002,
 # 0.395, 1.27, 3.46, 0.785, 2.475, 755.0]
 
+heatmapLabels = ['Positive', 'Negative']
+
 # compute 10-times-10-fold of *game dataset* using *information gain*
 print('*************** 10-times-10-fold of *game dataset* using *information gain* Start')
 acc_game_IG, CM_game_IG = tentenCV(10, gameList, gameHeaders, getIG)
 mean_game_IG = calMean(acc_game_IG)
 var_game_IG = calVariance(acc_game_IG)
+indexGIG = getMaxAccuracyIndex(acc_game_IG)
+CM1 = plotHeatCM(CM_game_IG, indexGIG)
+f1, ax1 = plt.subplots()
+sns.heatmap(CM1, square=True, annot=True, ax=ax1, cmap="Blues")
+ax1.set_xticklabels(heatmapLabels)
+ax1.set_yticklabels(heatmapLabels)
+ax1.set_title('Confusion Matrix of game_IG')
+ax1.set_xlabel('predict')
+ax1.set_ylabel('ground truth')
+plt.savefig('game_IG')
+
 # compute 10-times-10-fold of *game dataset* using *gain ratio*
 print('*************** 10-times-10-fold of *game dataset* using *gain ratio* Start')
 acc_game_GR, CM_game_GR = tentenCV(10, gameList, gameHeaders, getGR)
 mean_game_GR = calMean(acc_game_GR)
 var_game_GR = calVariance(acc_game_GR)
+indexGGR = getMaxAccuracyIndex(acc_game_GR)
+CM2 = plotHeatCM(CM_game_GR, indexGGR)
+f2, ax2 = plt.subplots()
+sns.heatmap(CM2, square=True, annot=True, ax=ax2, cmap="Blues")
+ax2.set_xticklabels(heatmapLabels)
+ax2.set_yticklabels(heatmapLabels)
+ax2.set_title('Confusion Matrix of game_GR')
+ax2.set_xlabel('predict')
+ax2.set_ylabel('ground truth')
+plt.savefig('game_GR')
+
 
 # transform the continuous dataset into continuous dataset
 wineDis = con2dis(thresholdList, wineList)
@@ -470,11 +490,108 @@ print('*************** 10-times-10-fold of *wine dataset* using *information gai
 acc_wine_IG, CM_wine_IG = tentenCV(10, wineDis, wineHeaders, getIG)
 mean_wine_IG = calMean(acc_wine_IG)
 var_wine_IG = calVariance(acc_wine_IG)
+indexWIG = getMaxAccuracyIndex(acc_wine_IG)
+CM3 = plotHeatCM(CM_wine_IG, indexWIG)
+f3, ax3 = plt.subplots()
+sns.heatmap(CM3, square=True, annot=True, ax=ax3, cmap="Blues")
+ax3.set_title('Confusion Matrix of wine_IG')
+ax3.set_xlabel('predict')
+ax3.set_ylabel('ground truth')
+plt.savefig('wine_IG')
+
 # compute 10-times-10-fold of *wine dataset* using *gain ratio*
 print('*************** 10-times-10-fold of *wine dataset* using *gain ratio* Start')
 acc_wine_GR, CM_wine_GR = tentenCV(10, wineDis, wineHeaders, getGR)
 mean_wine_GR = calMean(acc_wine_GR)
 var_wine_GR = calVariance(acc_wine_GR)
+indexWGR = getMaxAccuracyIndex(acc_wine_GR)
+CM4 = plotHeatCM(CM_wine_GR, indexWGR)
+f4, ax4 = plt.subplots()
+sns.heatmap(CM4, square=True, annot=True, ax=ax4, cmap="Blues")
+ax4.set_title('Confusion Matrix of wine_GR')
+ax4.set_xlabel('predict')
+ax4.set_ylabel('ground truth')
+plt.savefig('wine_GR')
+
+
+
+#Question 3:
+def addAttNoise(data, L, case):
+    '''
+    add L percent noise into each attribute (means L percent samples values in that attributes will be flipped)
+    :param data: the list data structure of input data
+    :param L: the percent of data be added noises
+    :param case: the case of data type (discrete or continuous) one of  'dis' or 'con'
+    :return: a new noised dataset (would not change input data)
+    '''
+    newdata = copy.deepcopy(data)  # deep copy a dataset
+    numAttribute = len(newdata[0]) - 1  # total number of attributes
+    numSample = len(newdata) # total number of samples
+    LSampleCount = round(numSample * L)  # the number of samples should be added noise
+    if case == 'dis':
+        for attribute in range(numAttribute):  # iterate each attributes
+            random.shuffle(newdata)  # shuffle the data
+            attributeValueList = list(set([newdata[sample][attribute] for sample in range(LSampleCount)]))
+            # store all the values which under the corresponding attributes into a list uniquely
+            for sampleIndex in range(LSampleCount):  # iterate L percent number samples
+                originalValue = newdata[sampleIndex][attribute]  # get the original value of corresponding attribute
+                attributeValueList.remove(originalValue)  # remove the original value from the list
+                newdata[sampleIndex][attribute] = attributeValueList[0]  # assign another value into the sample
+                attributeValueList.append(originalValue)  # append back original value
+        random.shuffle(newdata)  # shuffle the data
+        return newdata
+    elif case == 'con':
+        for attribute in range(numAttribute):  # iterate each attributes
+            random.shuffle(newdata)  # shuffle the data
+            for sampleIndex in range(LSampleCount):  # iterate L percent number samples
+                newdata[sampleIndex][attribute] += np.random.normal(loc=0, scale=1)
+        random.shuffle(newdata)  # shuffle the data
+        return newdata
+    else:
+        print('Error: Input parameter "sources" is invalid, should be "con" or "dis".')
+        return 0
+
+
+
+def addClassNoise(data, L, sources):
+    '''
+    Add class noises for L% of total samples (flip the class label randomly)
+    :param data: list data structure of input data
+    :param L: the percent of data be added noises
+    :param sources: sources for class of noises, 'con' or 'mis'.
+    :return: a new noised dataset (would not changed input data)
+    '''
+    newdata = copy.deepcopy(data)  # deep copy a dataset
+    numSample = len(newdata)  # total number of samples
+    LSampleCount = round(numSample * L)  # the number of samples should be added noise
+    classLabelList = list(set([sample[-1] for sample in newdata]))  # store all the values which under the class into a list
+    random.shuffle(newdata)  # shuffle the data in case always first several sample are deleted
+
+    if len(classLabelList) == 1:
+        print('Only one class in the dataset, cannot add class noise in this dataset')
+        return 0.
+    if sources == 'con':
+        del newdata[:LSampleCount]  # delete first LSampleCount number of sample
+        noises = copy.deepcopy(newdata[:LSampleCount])  # copy the first LSampleCount of removed data
+        for sample in noises:
+            originalValue = sample[-1]  # get and store the original class label
+            classLabelList.remove(originalValue)  # remove that label
+            sample[-1] = classLabelList[0]  # assign another class label to that sample
+            classLabelList.append(originalValue)  # put original value back to the list
+        newdata.extend(noises)  # put the noises back into the dataset
+        #return random.shuffle(newdata)
+        return newdata
+    elif sources == 'mis':
+        for sample in newdata[:LSampleCount]:
+            originalValue = sample[-1]  # get and store the original class label
+            classLabelList.remove(originalValue)  # remove that label
+            sample[-1] = classLabelList[0]  # assign another class label to that sample
+            classLabelList.append(originalValue)  # put original value back to the list
+        #return random.shuffle(newdata)
+        return newdata
+    else:
+        print('Error: Input parameter "sources" is invalid, should be "con" or "mis".')
+        return 0
 
 
 
