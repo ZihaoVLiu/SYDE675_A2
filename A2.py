@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
-f,ax=plt.subplots()
 sns.set()
 
 #open the data using read_csv of pandas
@@ -357,6 +356,7 @@ def con2dis(thresholdList, data):
         return newData
     else:
         print('Lengths of input parameters do not match')
+        return 0
 
 def foldCV(k, data, labels, function):
     '''this function computes the average and variance accuracy of input data
@@ -377,7 +377,7 @@ def foldCV(k, data, labels, function):
         testResult = batchPredict(trainFold, cvFold, labels, function)  # get the prediction result
         accuractList.append(calAccuracy(cvFold, testResult))  # compute accuracy and append into a list
         confusionMatrixList.append(plotConfusionMatrix(cvFold, testResult))  # same as above but confusion matrix
-        print('***The %d fold cross validation done***' % (i+1))
+        #print('***The %d fold cross validation done***' % (i+1))
     return accuractList, confusionMatrixList
 
 def tentenCV(k, data, labels, function):
@@ -397,7 +397,7 @@ def tentenCV(k, data, labels, function):
         print('%d time 10-fold cross validation is done' % (i + 1))
     stop = time()
     elapsed = stop - start
-    print('10 - 10 fold cross validation time is: %f seconds' % elapsed)
+    print('10 - 10 fold cross validation time is: %f seconds\n' % elapsed)
     return accuracyList, confusionMatrixList
 
 def calMean(accuracyList):
@@ -442,12 +442,15 @@ def plotHeatCM(CMList, indexList):
     CM = CMList[indexList[0]][indexList[1]]
     return CM
 
+
+#Question 2:
 thresholdList = getThreshold(wineList)
 # returned by getThreshold() function (To save time and every run time the results are same)
 # thresholdList = [12.78, 2.2350000000000003, 2.0300000000000002, 18.0, 88.5, 2.335, 1.5750000000000002,
 # 0.395, 1.27, 3.46, 0.785, 2.475, 755.0]
 
-heatmapLabels = ['Positive', 'Negative']
+heatmapGameLabels = ['Negative', 'Positive']
+heatmapWineLabels = ['3', '2', '1']
 
 # compute 10-times-10-fold of *game dataset* using *information gain*
 print('*************** 10-times-10-fold of *game dataset* using *information gain* Start')
@@ -458,8 +461,8 @@ indexGIG = getMaxAccuracyIndex(acc_game_IG)
 CM1 = plotHeatCM(CM_game_IG, indexGIG)
 f1, ax1 = plt.subplots()
 sns.heatmap(CM1, square=True, annot=True, ax=ax1, cmap="Blues")
-ax1.set_xticklabels(heatmapLabels)
-ax1.set_yticklabels(heatmapLabels)
+ax1.set_xticklabels(heatmapGameLabels)
+ax1.set_yticklabels(heatmapGameLabels)
 ax1.set_title('Confusion Matrix of game_IG')
 ax1.set_xlabel('predict')
 ax1.set_ylabel('ground truth')
@@ -474,13 +477,12 @@ indexGGR = getMaxAccuracyIndex(acc_game_GR)
 CM2 = plotHeatCM(CM_game_GR, indexGGR)
 f2, ax2 = plt.subplots()
 sns.heatmap(CM2, square=True, annot=True, ax=ax2, cmap="Blues")
-ax2.set_xticklabels(heatmapLabels)
-ax2.set_yticklabels(heatmapLabels)
+ax2.set_xticklabels(heatmapGameLabels)
+ax2.set_yticklabels(heatmapGameLabels)
 ax2.set_title('Confusion Matrix of game_GR')
 ax2.set_xlabel('predict')
 ax2.set_ylabel('ground truth')
 plt.savefig('game_GR')
-
 
 # transform the continuous dataset into continuous dataset
 wineDis = con2dis(thresholdList, wineList)
@@ -494,6 +496,8 @@ indexWIG = getMaxAccuracyIndex(acc_wine_IG)
 CM3 = plotHeatCM(CM_wine_IG, indexWIG)
 f3, ax3 = plt.subplots()
 sns.heatmap(CM3, square=True, annot=True, ax=ax3, cmap="Blues")
+ax3.set_xticklabels(heatmapWineLabels)
+ax3.set_yticklabels(heatmapWineLabels)
 ax3.set_title('Confusion Matrix of wine_IG')
 ax3.set_xlabel('predict')
 ax3.set_ylabel('ground truth')
@@ -508,14 +512,29 @@ indexWGR = getMaxAccuracyIndex(acc_wine_GR)
 CM4 = plotHeatCM(CM_wine_GR, indexWGR)
 f4, ax4 = plt.subplots()
 sns.heatmap(CM4, square=True, annot=True, ax=ax4, cmap="Blues")
+ax4.set_xticklabels(heatmapWineLabels)
+ax4.set_yticklabels(heatmapWineLabels)
 ax4.set_title('Confusion Matrix of wine_GR')
 ax4.set_xlabel('predict')
 ax4.set_ylabel('ground truth')
 plt.savefig('wine_GR')
 
+print('The mean and variance of the accuracy of 10 times-10 fold cross validation\n'
+      'game dataset with information gain approach are:\n%f and %f' % (mean_game_IG, var_game_IG))
+
+print('The mean and variance of the accuracy of 10 times-10 fold cross validation\n'
+      'game dataset with gain ratio approach are:\n%f and %f' % (mean_game_GR, var_game_GR))
+
+print('The mean and variance of the accuracy of 10 times-10 fold cross validation\n'
+      'wine dataset with information gain approach are:\n%f and %f' % (mean_wine_IG, var_wine_IG))
+
+print('The mean and variance of the accuracy of 10 times-10 fold cross validation\n'
+      'wine dataset with gain ratio approach are:\n%f and %f' % (mean_wine_GR, var_wine_GR))
+print('\n')
 
 
-#Question 3:
+
+#Question 3 functions:
 def addAttNoise(data, L, case):
     '''
     add L percent noise into each attribute (means L percent samples values in that attributes will be flipped)
@@ -528,11 +547,18 @@ def addAttNoise(data, L, case):
     numAttribute = len(newdata[0]) - 1  # total number of attributes
     numSample = len(newdata) # total number of samples
     LSampleCount = round(numSample * L)  # the number of samples should be added noise
+    if numAttribute == 9:
+        attributeValueList = ['o', 'x', 'b']
+    elif numAttribute == 13:
+        attributeValueList = [0, 1]
+    else:
+        print("Error: input data is not wine or game.")
+        return 0
+    #attributeValueList = max([list(set(sample[:-1])) for sample in newdata])
+    # store all the values which under the corresponding attributes into a list uniquely
     if case == 'dis':
         for attribute in range(numAttribute):  # iterate each attributes
             random.shuffle(newdata)  # shuffle the data
-            attributeValueList = list(set([newdata[sample][attribute] for sample in range(LSampleCount)]))
-            # store all the values which under the corresponding attributes into a list uniquely
             for sampleIndex in range(LSampleCount):  # iterate L percent number samples
                 originalValue = newdata[sampleIndex][attribute]  # get the original value of corresponding attribute
                 attributeValueList.remove(originalValue)  # remove the original value from the list
@@ -594,6 +620,175 @@ def addClassNoise(data, L, sources):
         return 0
 
 
+def foldCVNoise(k, data, labels, function, noiseP, whom, case):
+    '''this function computes the average and variance accuracy of input data
+    k is the number of fold
+    data is the original data
+    labels is the dataset headers
+    function parameter is the function name of decision-tree learning algorithms (one of getIG or getGR)
+    noiseP the percentage of noise
+    whom indicates which dataset should be add noised
+    case: the case of data type (discrete or continuous) one of  'dis' or 'con'
+    return a list of accuracy and a list of confusion matrix'''
+    random.shuffle(data) # permute training data at each run
+    sampleCount = len(data) # get the total number of samples
+    cvCount = round(sampleCount / k) # number of cross validation fold
+    accuractList = [] # initialed a list to save accuracy
+    confusionMatrixList = [] # initialed a list to save confusion matrix
+    if whom == 'train':
+        for i in range(k): # iterate k times
+            cvFold = data[i*cvCount:(i+1)*cvCount] # get the cross validation dataset based on number of fold
+            trainFold = addAttNoise(data[0:i*cvCount] + data[(i+1)*cvCount:], noiseP, case)# set the rest of samples
+            # as training dataset
+            testResult = batchPredict(trainFold, cvFold, labels, function)  # get the prediction result
+            accuractList.append(calAccuracy(cvFold, testResult))  # compute accuracy and append into a list
+            confusionMatrixList.append(plotConfusionMatrix(cvFold, testResult))  # same as above but confusion matrix
+            #print('***The %d fold cross validation done***' % (i+1))
+        return accuractList, confusionMatrixList
+    elif whom == 'test':
+        for i in range(k): # iterate k times
+            cvFold = addAttNoise(data[i*cvCount:(i+1)*cvCount], noiseP, case) # get the cross validation dataset based on number of fold
+            trainFold = data[0:i*cvCount] + data[(i+1)*cvCount:]# set the rest of samples
+            # as training dataset
+            testResult = batchPredict(trainFold, cvFold, labels, function)  # get the prediction result
+            accuractList.append(calAccuracy(cvFold, testResult))  # compute accuracy and append into a list
+            confusionMatrixList.append(plotConfusionMatrix(cvFold, testResult))  # same as above but confusion matrix
+            #print('***The %d fold cross validation done***' % (i+1))
+        return accuractList, confusionMatrixList
+    elif whom == 'both':
+        for i in range(k): # iterate k times
+            cvFold = addAttNoise(data[i*cvCount:(i+1)*cvCount], noiseP, case) # get the cross validation dataset based on number of fold
+            trainFold = addAttNoise(data[0:i*cvCount] + data[(i+1)*cvCount:], noiseP, case)# set the rest of samples
+            # as training dataset
+            testResult = batchPredict(trainFold, cvFold, labels, function)  # get the prediction result
+            accuractList.append(calAccuracy(cvFold, testResult))  # compute accuracy and append into a list
+            confusionMatrixList.append(plotConfusionMatrix(cvFold, testResult))  # same as above but confusion matrix
+            #print('***The %d fold cross validation done***' % (i+1))
+        return accuractList, confusionMatrixList
+    elif whom == 'neither':
+        for i in range(k): # iterate k times
+            cvFold = data[i*cvCount:(i+1)*cvCount]  # get the cross validation dataset based on number of fold
+            trainFold = data[0:i*cvCount] + data[(i+1)*cvCount:]  # set the rest of samples
+            # as training dataset
+            testResult = batchPredict(trainFold, cvFold, labels, function)  # get the prediction result
+            accuractList.append(calAccuracy(cvFold, testResult))  # compute accuracy and append into a list
+            confusionMatrixList.append(plotConfusionMatrix(cvFold, testResult))  # same as above but confusion matrix
+            #print('***The %d fold cross validation done***' % (i+1))
+        return accuractList, confusionMatrixList
+    else:
+        print('Error: input parameter is wrong.')
+        return 0
+
+def tentenCVNoise(k, data, labels, function, noiseP, whom, case):
+    '''implement the 10-times-10-fold cross validation approach
+    k is the number of fold
+    data is the original data
+    labels is the dataset headers
+    function parameter is the function name of decision-tree learning algorithms (one of getIG or getGR)
+    noiseP the percentage of noise
+    whom indicates which dataset should be add noised
+    case: the case of data type (discrete or continuous) one of  'dis' or 'con'
+    return a list of accuracy and a list of confusion matrix'''
+    start = time()
+    accuracyList = []  # initial a list to store the accuracy
+    confusionMatrixList = []  # initial a list to store the confusion matrix
+    for i in range(10):  # iterate ten time of k-fold cross validation
+        accuracy, confusionMatrix = foldCVNoise(k, data, labels, function, noiseP, whom, case)
+        accuracyList.append(accuracy)
+        confusionMatrixList.append(confusionMatrix)
+        print('%d time 10-fold cross validation is done' % (i + 1))
+    stop = time()
+    elapsed = stop - start
+    print('10 - 10 fold cross validation time is: %f seconds\n' % elapsed)
+    return accuracyList, confusionMatrixList
+
+
+#Question3:
+#Game with noise
+#CvsC
+print('Game with noise start.')
+print('CvsC accuracy generating start.')
+acc_game_IG_CC_0, CM_game_IG_CC_0 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0, 'neither', 'dis')
+acc_game_IG_CC_5, CM_game_IG_CC_5 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.05, 'neither', 'dis')
+acc_game_IG_CC_10, CM_game_IG_CC_10 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.1, 'neither', 'dis')
+acc_game_IG_CC_15, CM_game_IG_CC_15 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.15, 'neither', 'dis')
+CCAccuracyMean = [calMean(acc_game_IG_CC_0), calMean(acc_game_IG_CC_5), calMean(acc_game_IG_CC_10),
+                  calMean(acc_game_IG_CC_15)]
+CCAccuracyVar = [calVariance(acc_game_IG_CC_0), calVariance(acc_game_IG_CC_5), calVariance(acc_game_IG_CC_10),
+                 calVariance(acc_game_IG_CC_15)]
+# DvsC
+print('DvsC accuracy generating start.')
+acc_game_IG_DC_0, CM_game_IG_DC_0 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0, 'train', 'dis')
+acc_game_IG_DC_5, CM_game_IG_DC_5 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.05, 'train', 'dis')
+acc_game_IG_DC_10, CM_game_IG_DC_10 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.1, 'train', 'dis')
+acc_game_IG_DC_15, CM_game_IG_DC_15 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.15, 'train', 'dis')
+DCAccuracyMean = [calMean(acc_game_IG_DC_0), calMean(acc_game_IG_DC_5), calMean(acc_game_IG_DC_10),
+                  calMean(acc_game_IG_DC_15)]
+DCAccuracyVar = [calVariance(acc_game_IG_DC_0), calVariance(acc_game_IG_DC_5), calVariance(acc_game_IG_DC_10),
+                 calVariance(acc_game_IG_DC_15)]
+# CvsD
+print('CvsD accuracy generating start.')
+acc_game_IG_CD_0, CM_game_IG_CD_0 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0, 'test', 'dis')
+acc_game_IG_CD_5, CM_game_IG_CD_5 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.05, 'test', 'dis')
+acc_game_IG_CD_10, CM_game_IG_CD_10 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.1, 'test', 'dis')
+acc_game_IG_CD_15, CM_game_IG_CD_15 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.15, 'test', 'dis')
+CDAccuracyMean = [calMean(acc_game_IG_CD_0), calMean(acc_game_IG_CD_5), calMean(acc_game_IG_CD_10),
+                  calMean(acc_game_IG_CD_15)]
+CDAccuracyVar = [calVariance(acc_game_IG_CD_0), calVariance(acc_game_IG_CD_5), calVariance(acc_game_IG_CD_10),
+                 calVariance(acc_game_IG_CD_15)]
+# DvsD
+print('DvsD accuracy generating start.')
+acc_game_IG_DD_0, CM_game_IG_DD_0 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0, 'both', 'dis')
+acc_game_IG_DD_5, CM_game_IG_DD_5 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.05, 'both', 'dis')
+acc_game_IG_DD_10, CM_game_IG_DD_10 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.1, 'both', 'dis')
+acc_game_IG_DD_15, CM_game_IG_DD_15 = tentenCVNoise(10, gameList, gameHeaders, getIG, 0.15, 'both', 'dis')
+DDAccuracyMean = [calMean(acc_game_IG_DD_0), calMean(acc_game_IG_DD_5), calMean(acc_game_IG_DD_10),
+                  calMean(acc_game_IG_DD_15)]
+DDAccuracyVar = [calVariance(acc_game_IG_DD_0), calVariance(acc_game_IG_DD_5), calVariance(acc_game_IG_DD_10),
+                 calVariance(acc_game_IG_DD_15)]
+
+#Wine with noise
+#CvsC
+print('Wine with noise start.')
+print('CvsC accuracy generating start.')
+acc_wine_IG_CC_0, CM_wine_IG_CC_0 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0, 'neither', 'dis')
+acc_wine_IG_CC_5, CM_wine_IG_CC_5 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.05, 'neither', 'dis')
+acc_wine_IG_CC_10, CM_wine_IG_CC_10 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.1, 'neither', 'dis')
+acc_wine_IG_CC_15, CM_wine_IG_CC_15 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.15, 'neither', 'dis')
+CCWineAccuracyMean = [calMean(acc_wine_IG_CC_0), calMean(acc_wine_IG_CC_5), calMean(acc_wine_IG_CC_10),
+                  calMean(acc_wine_IG_CC_15)]
+CCWineAccuracyVar = [calVariance(acc_wine_IG_CC_0), calVariance(acc_wine_IG_CC_5), calVariance(acc_wine_IG_CC_10),
+                 calVariance(acc_wine_IG_CC_15)]
+# DvsC
+print('DvsC accuracy generating start.')
+acc_wine_IG_DC_0, CM_wine_IG_DC_0 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0, 'train', 'dis')
+acc_wine_IG_DC_5, CM_wine_IG_DC_5 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.05, 'train', 'dis')
+acc_wine_IG_DC_10, CM_wine_IG_DC_10 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.1, 'train', 'dis')
+acc_wine_IG_DC_15, CM_wine_IG_DC_15 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.15, 'train', 'dis')
+DCWineAccuracyMean = [calMean(acc_wine_IG_DC_0), calMean(acc_wine_IG_DC_5), calMean(acc_wine_IG_DC_10),
+                  calMean(acc_wine_IG_DC_15)]
+DCWineAccuracyVar = [calVariance(acc_wine_IG_DC_0), calVariance(acc_wine_IG_DC_5), calVariance(acc_wine_IG_DC_10),
+                 calVariance(acc_wine_IG_DC_15)]
+# CvsD
+print('CvsD accuracy generating start.')
+acc_wine_IG_CD_0, CM_wine_IG_CD_0 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0, 'test', 'dis')
+acc_wine_IG_CD_5, CM_wine_IG_CD_5 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.05, 'test', 'dis')
+acc_wine_IG_CD_10, CM_wine_IG_CD_10 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.1, 'test', 'dis')
+acc_wine_IG_CD_15, CM_wine_IG_CD_15 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.15, 'test', 'dis')
+CDWineAccuracyMean = [calMean(acc_wine_IG_CD_0), calMean(acc_wine_IG_CD_5), calMean(acc_wine_IG_CD_10),
+                  calMean(acc_wine_IG_CD_15)]
+CDWineAccuracyVar = [calVariance(acc_wine_IG_CD_0), calVariance(acc_wine_IG_CD_5), calVariance(acc_wine_IG_CD_10),
+                 calVariance(acc_wine_IG_CD_15)]
+# DvsD
+print('DvsD accuracy generating start.')
+acc_wine_IG_DD_0, CM_wine_IG_DD_0 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0, 'both', 'dis')
+acc_wine_IG_DD_5, CM_wine_IG_DD_5 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.05, 'both', 'dis')
+acc_wine_IG_DD_10, CM_wine_IG_DD_10 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.1, 'both', 'dis')
+acc_wine_IG_DD_15, CM_wine_IG_DD_15 = tentenCVNoise(10, wineDis, wineHeaders, getIG, 0.15, 'both', 'dis')
+DDWineAccuracyMean = [calMean(acc_wine_IG_DD_0), calMean(acc_wine_IG_DD_5), calMean(acc_wine_IG_DD_10),
+                  calMean(acc_wine_IG_DD_15)]
+DDWineAccuracyVar = [calVariance(acc_wine_IG_DD_0), calVariance(acc_wine_IG_DD_5), calVariance(acc_wine_IG_DD_10),
+                 calVariance(acc_wine_IG_DD_15)]
 
 
 
